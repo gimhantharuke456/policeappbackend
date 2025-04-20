@@ -13,6 +13,7 @@
 # production
 /build
 /uploads
+/tracks
 # misc
 .DS_Store
 .env.local

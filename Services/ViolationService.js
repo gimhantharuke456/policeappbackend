@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const { ObjectId } = mongoose.Types;
 
 class ViolationService {
+  
   static async addViolation(tourist, violation, officer, timestamp) {
     console.log(tourist);
     try {
