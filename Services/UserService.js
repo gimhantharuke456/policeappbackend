@@ -1,4 +1,5 @@
 const User = require("../Models/Usermodel");
+const RegSVC = require("../Models/RegSVC");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 
@@ -11,8 +12,18 @@ class UserService {
     Password
   ) {
     try {
-      // console.log("Registration attempt:", { email, name, mobile });
+      // First, check if the officer's SVC number exists in the RegSVC table
+      const validSVC = await RegSVC.findOne({ officerSVC: officerSVC });
 
+      if (!validSVC) {
+        console.log("Officer SVC not found in authorized list");
+        return {
+          success: false,
+          message: "Officer SVC number is not authorized for registration",
+        };
+      }
+
+      // Check if user already exists in the User table
       const existingUser = await User.findOne({
         officerSVC: officerSVC,
       });
@@ -125,7 +136,14 @@ class UserService {
     }
   }
 
-  static async updateProfile(officerSVC, fullName, policeStation) {
+  static async updateProfile(
+    officerSVC,
+    fullName,
+    policeStation,
+    contactNumber,
+    email,
+    officerRank
+  ) {
     try {
       if (!officerSVC) {
         return { success: false, message: "Officer SVC is required" };
@@ -134,6 +152,9 @@ class UserService {
       const updateData = {};
       if (fullName) updateData.fullName = fullName;
       if (policeStation) updateData.policeStation = policeStation;
+      if (contactNumber) updateData.phone = contactNumber;
+      if (email) updateData.email = email;
+      if (officerRank) updateData.officerRank = officerRank;
 
       const updatedUser = await User.findOneAndUpdate(
         { officerSVC },
@@ -156,6 +177,32 @@ class UserService {
       };
     } catch (error) {
       console.error("Error in updateProfile service:", error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  static async getUserById(officerSVC) {
+    try {
+      console.log("Getting user details for:", officerSVC);
+      const user = await User.findOne({ officerSVC });
+
+      if (!user) {
+        return { success: false, message: "User not found" };
+      }
+
+      return {
+        success: true,
+        data: {
+          officerSVC: user.officerSVC,
+          fullName: user.fullName,
+          policeStation: user.policeStation,
+          officerRank: user.officerRank,
+          contactNumber: user.phone || "",
+          email: user.email || "",
+        },
+      };
+    } catch (error) {
+      console.error("getUserById error:", error);
       return { success: false, message: error.message };
     }
   }

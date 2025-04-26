@@ -15,7 +15,8 @@ const upload = multer({ storage: storage, dest: "uploads/" });
 
 exports.register = async (req, res, next) => {
   try {
-    const { fullName, officerSVC, officerRank, policeStation,Password } = req.body;
+    const { fullName, officerSVC, officerRank, policeStation, Password } =
+      req.body;
 
     console.log("Register request received:", {
       fullName,
@@ -23,7 +24,7 @@ exports.register = async (req, res, next) => {
       officerSVC,
       officerRank,
       policeStation,
-      Password
+      Password,
     });
 
     const successRes = await UserService.registerUser(
@@ -37,7 +38,11 @@ exports.register = async (req, res, next) => {
     console.log("Registration response:", successRes);
 
     if (successRes.success) {
-      res.status(201).json({ status: true, success: successRes.message,data: successRes.data});
+      res.status(201).json({
+        status: true,
+        success: successRes.message,
+        data: successRes.data,
+      });
     } else {
       res.status(400).json({ status: false, error: successRes.message });
     }
@@ -76,7 +81,7 @@ exports.login = async (req, res, next) => {
     }
 
     const tokenData = { id: user._id, officerSVC: user.officerSVC };
-    
+
     const token = await UserService.genarateToken(
       tokenData,
       process.env.JWT_SECRET,
@@ -84,11 +89,16 @@ exports.login = async (req, res, next) => {
     );
 
     console.log("Login successful, token generated");
-    res.status(201).json({ status: true, success: "Login successful",data: {
-      token,
-      officerSVC: user.officerSVC,
-      fullName: user.fullName,
-      policeStation: user.policeStation}});
+    res.status(201).json({
+      status: true,
+      success: "Login successful",
+      data: {
+        token,
+        officerSVC: user.officerSVC,
+        fullName: user.fullName,
+        policeStation: user.policeStation,
+      },
+    });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ status: false, error: "Internal Server Error" });
@@ -97,45 +107,61 @@ exports.login = async (req, res, next) => {
 
 exports.verify = async (req, res, next) => {
   try {
-    const authHeader = req.headers['authorization'];
+    const authHeader = req.headers["authorization"];
     const { officerSVC } = req.body;
 
-    console.log('auth header',authHeader);
-    console.log('user',officerSVC);
+    console.log("auth header", authHeader);
+    console.log("user", officerSVC);
 
-    const user = await UserService.checkUser('1111');
+    const user = await UserService.checkUser("1111");
     if (!user) {
-      return res
-        .status(401)
-        .json({ status: false, error: "No User Found" });
+      return res.status(401).json({ status: false, error: "No User Found" });
     }
 
-    const successRes = await UserService.authenticateToken(
-      authHeader,next
-    );
-    console.log(successRes)
+    const successRes = await UserService.authenticateToken(authHeader, next);
+    console.log(successRes);
 
     if (successRes.success) {
-      res.status(201).json({ status: true, success: successRes.message,data: {officerSVC: user.officerSVC,
-        fullName: user.fullName,
-        policeStation: user.policeStation}});
-    }else {
+      res.status(201).json({
+        status: true,
+        success: successRes.message,
+        data: {
+          officerSVC: user.officerSVC,
+          fullName: user.fullName,
+          policeStation: user.policeStation,
+        },
+      });
+    } else {
       res.status(400).json({ status: false, error: successRes.message });
     }
-    
-    
   } catch (error) {
-    console.error('Verification error:', error);
-    res.status(500).json({ message: 'Verification failed', error: error.message });
+    console.error("Verification error:", error);
+    res
+      .status(500)
+      .json({ message: "Verification failed", error: error.message });
   }
 };
 
 exports.updateProfile = async (req, res) => {
   try {
-    const { officerSVC, fullName, policeStation } = req.body;
+    const {
+      officerSVC,
+      fullName,
+      policeStation,
+      officerRank,
+      contactNumber,
+      email,
+    } = req.body;
     console.log("Updating profile for officer:", officerSVC);
 
-    const result = await UserService.updateProfile(officerSVC, fullName, policeStation);
+    const result = await UserService.updateProfile(
+      officerSVC,
+      fullName,
+      policeStation,
+      contactNumber,
+      email,
+      officerRank
+    );
     if (result.success) {
       return res.status(200).json({
         status: true,
@@ -153,9 +179,6 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({ status: false, error: "Internal Server Error" });
   }
 };
-
-
-
 
 exports.updateLocation = async (req, res, next) => {
   try {
@@ -188,7 +211,6 @@ exports.updateLocation = async (req, res, next) => {
     res.status(500).json({ status: false, error: "Internal Server Error" });
   }
 };
-
 
 exports.updateAddress = async (req, res, next) => {
   try {
@@ -270,18 +292,26 @@ exports.updateUserData = async (req, res, next) => {
   }
 };
 
-exports.getUserDetails = async (req, res, next) => {
+exports.getProfileDetails = async (req, res) => {
   try {
-    const { email } = req.body;
-    const successRes = await UserService.getUserById(email);
-    console.log(successRes);
-    if (successRes.success) {
-      res.status(200).json({ status: true, user: successRes.user });
+    const { id } = req.params;
+    console.log("Fetching user profile by ID:", id);
+
+    const result = await UserService.getUserById(id);
+
+    if (result.success) {
+      return res.status(200).json({
+        status: true,
+        data: result.data,
+      });
     } else {
-      res.status(404).json({ status: false, error: successRes.message });
+      return res.status(404).json({
+        status: false,
+        error: result.message,
+      });
     }
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error in getProfileDetails:", error);
     res.status(500).json({ status: false, error: "Internal Server Error" });
   }
 };

@@ -44,7 +44,8 @@ const violationsRoute = require("./Routes/ViolationRoute");
 const ruleRoute = require("./Routes/RuleRoute");
 const cors = require("cors");
 const path = require("path");
-const fs = require('fs');
+const fs = require("fs");
+const RegSVCModel = require("./Models/RegSVC");
 
 const app = express();
 
@@ -154,6 +155,132 @@ app.get("/api/tracks/:ruleNumber", (req, res) => {
     res.status(500).json({
       success: false,
       message: `Failed to fetch audio files for rule ${req.params.ruleNumber}`,
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint to add dummy SVC data
+app.post("/api/admin/add-svc", async (req, res) => {
+  try {
+    const { officerSVC, officerRank, policeStation, isActive } = req.body;
+
+    // Validate required fields
+    if (!officerSVC) {
+      return res.status(400).json({
+        success: false,
+        message: "Officer SVC number is required",
+      });
+    }
+
+    // Check if SVC already exists
+    const existingSVC = await RegSVCModel.findOne({ officerSVC });
+    if (existingSVC) {
+      return res.status(400).json({
+        success: false,
+        message: "This SVC number is already registered",
+      });
+    }
+
+    // Create new SVC entry
+    const newSVC = new RegSVCModel({
+      officerSVC,
+      officerRank: officerRank || undefined,
+      policeStation: policeStation || undefined,
+      isActive: isActive !== undefined ? isActive : true,
+    });
+
+    await newSVC.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "SVC number added successfully",
+      data: newSVC,
+    });
+  } catch (error) {
+    console.error("Error adding SVC:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add SVC number",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint to add multiple SVC entries at once
+app.post("/api/admin/bulk-add-svc", async (req, res) => {
+  try {
+    const { entries } = req.body;
+
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide an array of SVC entries",
+      });
+    }
+
+    // Validate each entry has officerSVC
+    for (const entry of entries) {
+      if (!entry.officerSVC) {
+        return res.status(400).json({
+          success: false,
+          message: "All entries must have an officerSVC number",
+        });
+      }
+    }
+
+    // Filter out existing SVC numbers
+    const existingSVCs = await RegSVCModel.find({
+      officerSVC: { $in: entries.map((e) => e.officerSVC) },
+    });
+
+    const existingSVCNumbers = existingSVCs.map((e) => e.officerSVC);
+
+    const newEntries = entries.filter(
+      (entry) => !existingSVCNumbers.includes(entry.officerSVC)
+    );
+
+    if (newEntries.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "All provided SVC numbers already exist",
+      });
+    }
+
+    // Insert new entries
+    const result = await RegSVCModel.insertMany(newEntries);
+
+    return res.status(201).json({
+      success: true,
+      message: `Successfully added ${result.length} SVC entries`,
+      skipped: entries.length - newEntries.length,
+      data: result,
+    });
+  } catch (error) {
+    console.error("Error bulk adding SVCs:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add SVC entries",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint to get all registered SVC numbers
+app.get("/api/admin/list-svc", async (req, res) => {
+  try {
+    const svcEntries = await RegSVCModel.find({});
+
+    return res.status(200).json({
+      success: true,
+      count: svcEntries.length,
+      data: svcEntries,
+    });
+  } catch (error) {
+    console.error("Error listing SVCs:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve SVC entries",
       error: error.message,
     });
   }
