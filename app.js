@@ -249,25 +249,37 @@ app.get("/api/admin/list-svc", async (req, res) => {
 
 // Serve static voicerecords files
 // Load R2 configuration
-const r2Config = require('./r2Config');
+const r2Config = require("./r2Config");
+const { folderNameMapping } = require("./folderNameMapping");
 
 // Keep local static serving for backward compatibility
 app.use("/voicerecords", express.static(path.join(__dirname, "voicerecords")));
 
 // API route to get audio files from voicerecords folder by rule name
-app.get("/api/voicerecords/:ruleName", (req, res) => {
+app.get("/api/voicerecords/:ruleName", async (req, res) => {
   try {
     const { ruleName } = req.params;
+    console.log(`Rule name ${ruleName}`);
+   
+    // Check if ruleName is already a numeric folder name or needs mapping
+    const folderName = folderNameMapping[ruleName];
+    console.log(`Folder name ${folderName}`);
+
     const rulePath = path.join(__dirname, "voicerecords", ruleName);
-    console.log(rulePath);
-    // Check if directory exists locally (for development/fallback)
+    console.log(`Rule Path ${rulePath}`);
+
     if (!fs.existsSync(rulePath)) {
       return res.status(404).json({
         success: false,
-        message: `No folder found for rule: ${ruleName}`,
+        message: `No folder found for rule: ${folderName}`,
       });
     }
-
+    const generateR2Url = (folderName, fileName) => {
+      return `${r2Config.publicUrl}/${
+        r2Config.baseFolderPath
+      }/${encodeURIComponent(folderName)}/${encodeURIComponent(fileName)}`;
+    };
+    let mainAudioFile;
     // Get all audio files in the folder
     const files = fs
       .readdirSync(rulePath)
@@ -279,87 +291,126 @@ app.get("/api/voicerecords/:ruleName", (req, res) => {
       );
 
     if (files.length === 0) {
+      console.log("if triggered");
+      // Try to get files from R2 storage if no local files found
+      try {
+        const {
+          S3Client,
+          ListObjectsV2Command,
+        } = require("@aws-sdk/client-s3");
+
+        // Create R2 client
+        const r2Client = new S3Client({
+          region: r2Config.s3Config.region,
+          endpoint: r2Config.s3Config.endpoint,
+          credentials: r2Config.s3Config.credentials,
+        });
+
+        // List objects in the folder
+        const command = new ListObjectsV2Command({
+          Bucket: r2Config.bucketName,
+          Prefix: `${r2Config.baseFolderPath}/${folderName}/`,
+          MaxKeys: 100,
+        });
+
+        const response = await r2Client.send(command);
+        
+       
+        if (response.Contents && response.Contents.length > 0) {
+          // Extract filenames from keys
+          const r2Files = response.Contents.map((item) => {
+            const key = item.Key;
+            // Extract filename from the key
+            const parts = key.split("/");
+            return parts[parts.length - 1];
+          }).filter(
+            (file) =>
+              file.endsWith(".mp3") ||
+              file.endsWith(".wav") ||
+              file.endsWith(".m4a")
+          );
+
+          console.log(`There are ${r2Files.length} files in R2`);
+
+          if (r2Files.length > 0) {
+            // Look for the main audio file that matches the rule name
+            mainAudioFile = r2Files.find(
+              (file) =>
+                file === `${folderName}.mp3` ||
+                file === `${folderName}.wav` ||
+                file === `${folderName}.m4a`
+            );
+
+            // Return R2 URLs for the files
+            return res.json({
+              success: true,
+              ruleName,
+              mainFile: mainAudioFile
+                ? {
+                    filename: mainAudioFile,
+                    url: generateR2Url(folderName, mainAudioFile),
+                    type: path.extname(mainAudioFile).substring(1),
+                    fromR2: true,
+                  }
+                : null,
+              allFiles: r2Files.map((filename) => ({
+                filename,
+                url: generateR2Url(folderName, filename),
+                type: path.extname(filename).substring(1),
+                isMainFile: filename === mainAudioFile,
+                fromR2: true,
+              })),
+            });
+          }
+        }
+      } catch (error) {
+        console.error(
+          `Error fetching files from R2 for rule ${ruleName}:`,
+          error
+        );
+      }
+
       return res.status(404).json({
         success: false,
         message: `No audio files found for rule: ${ruleName}`,
       });
     }
 
-    // Look for the main audio file that matches the rule name
-    const mainAudioFile = files.find(
-      (file) =>
-        file === `${ruleName}.mp3` ||
-        file === `${ruleName}.wav` ||
-        file === `${ruleName}.m4a`
-    );
-
     // Function to generate R2 URL for a file
-    const generateR2Url = (folderName, fileName) => {
-      return `${r2Config.publicUrl}/${r2Config.baseFolderPath}/${encodeURIComponent(folderName)}/${encodeURIComponent(fileName)}`;
-    };
+    
 
-    console.log(generateR2Url(ruleName,mainAudioFile));
+    return res.json({
+      success: true,
+      ruleName,
+      mainFile: {
+        filename: mainAudioFile,
+        // Use R2 URL for production, fallback to local URL for development
+        url: generateR2Url(ruleName, mainAudioFile),
+        localUrl: `${req.protocol}://${req.get(
+          "host"
+        )}/voicerecords/${encodeURIComponent(folderName)}/${encodeURIComponent(
+          mainAudioFile
+        )}`,
 
-    if (mainAudioFile) {
-      // If main audio file exists, return it directly
-      const filePath = path.join(rulePath, mainAudioFile);
-      const stats = fs.statSync(filePath);
-      
-      return res.json({
-        success: true,
-        ruleName,
-        mainFile: {
-          filename: mainAudioFile,
+        type: path.extname(mainAudioFile).substring(1),
+      },
+      allFiles: files.map((filename) => {
+        const fileStats = fs.statSync(path.join(rulePath, filename));
+        return {
+          filename,
           // Use R2 URL for production, fallback to local URL for development
-          url: generateR2Url(ruleName, mainAudioFile),
-          localUrl: `${req.protocol}://${req.get("host")}/voicerecords/${encodeURIComponent(ruleName)}/${encodeURIComponent(mainAudioFile)}`,
-          size: stats.size,
-          type: path.extname(mainAudioFile).substring(1),
-        },
-        allFiles: files.map((filename) => {
-          const fileStats = fs.statSync(path.join(rulePath, filename));
-          return {
-            filename,
-            // Use R2 URL for production, fallback to local URL for development
-            url: generateR2Url(ruleName, filename),
-            localUrl: `${req.protocol}://${req.get("host")}/voicerecords/${encodeURIComponent(ruleName)}/${encodeURIComponent(filename)}`,
-            size: fileStats.size,
-            type: path.extname(filename).substring(1),
-            isMainFile: filename === mainAudioFile,
-          };
-        }),
-      });
-    } else {
-      // If no main file, return the first audio file found
-      const firstAudioFile = files[0];
-      const filePath = path.join(rulePath, firstAudioFile);
-      const stats = fs.statSync(filePath);
-      
-      return res.json({
-        success: true,
-        ruleName,
-        mainFile: {
-          filename: firstAudioFile,
-          // Use R2 URL for production, fallback to local URL for development
-          url: generateR2Url(ruleName, firstAudioFile),
-          localUrl: `${req.protocol}://${req.get("host")}/voicerecords/${encodeURIComponent(ruleName)}/${encodeURIComponent(firstAudioFile)}`,
-          size: stats.size,
-          type: path.extname(firstAudioFile).substring(1),
-        },
-        allFiles: files.map((filename) => {
-          const fileStats = fs.statSync(path.join(rulePath, filename));
-          return {
-            filename,
-            // Use R2 URL for production, fallback to local URL for development
-            url: generateR2Url(ruleName, filename),
-            localUrl: `${req.protocol}://${req.get("host")}/voicerecords/${encodeURIComponent(ruleName)}/${encodeURIComponent(filename)}`,
-            size: fileStats.size,
-            type: path.extname(filename).substring(1),
-            isMainFile: filename === firstAudioFile,
-          };
-        }),
-      });
-    }
+          url: generateR2Url(ruleName, filename),
+          localUrl: `${req.protocol}://${req.get(
+            "host"
+          )}/voicerecords/${encodeURIComponent(ruleName)}/${encodeURIComponent(
+            filename
+          )}`,
+          size: fileStats.size,
+          type: path.extname(filename).substring(1),
+          isMainFile: filename === mainAudioFile,
+        };
+      }),
+    });
   } catch (error) {
     console.error(
       `Error getting audio files for rule ${req.params.ruleName}:`,
@@ -390,7 +441,7 @@ app.get("/api/voicerecords", (req, res) => {
               file.endsWith(".wav") ||
               file.endsWith(".m4a")
           );
-        
+
         // Find main audio file if it exists
         const mainAudioFile = audioFiles.find(
           (file) =>
@@ -398,20 +449,28 @@ app.get("/api/voicerecords", (req, res) => {
             file === `${dirent.name}.wav` ||
             file === `${dirent.name}.m4a`
         );
-        
+
         // Generate R2 URL for main file if it exists
         let mainFileUrl = null;
         if (mainAudioFile) {
-          mainFileUrl = `${r2Config.publicUrl}/${r2Config.baseFolderPath}/${encodeURIComponent(dirent.name)}/${encodeURIComponent(mainAudioFile)}`;
+          mainFileUrl = `${r2Config.publicUrl}/${
+            r2Config.baseFolderPath
+          }/${encodeURIComponent(dirent.name)}/${encodeURIComponent(
+            mainAudioFile
+          )}`;
         }
-        
+
         return {
           name: dirent.name,
           audioFileCount: audioFiles.length,
           hasMainFile: !!mainAudioFile,
           mainFileUrl: mainFileUrl,
-          r2FolderUrl: `${r2Config.publicUrl}/${r2Config.baseFolderPath}/${encodeURIComponent(dirent.name)}/`,
-          localFolderUrl: `${req.protocol}://${req.get("host")}/voicerecords/${encodeURIComponent(dirent.name)}/`
+          r2FolderUrl: `${r2Config.publicUrl}/${
+            r2Config.baseFolderPath
+          }/${encodeURIComponent(dirent.name)}/`,
+          localFolderUrl: `${req.protocol}://${req.get(
+            "host"
+          )}/voicerecords/${encodeURIComponent(dirent.name)}/`,
         };
       });
 
@@ -420,7 +479,7 @@ app.get("/api/voicerecords", (req, res) => {
       folders: folders,
       totalFolders: folders.length,
       baseR2Url: `${r2Config.publicUrl}/${r2Config.baseFolderPath}/`,
-      baseLocalUrl: `${req.protocol}://${req.get("host")}/voicerecords/`
+      baseLocalUrl: `${req.protocol}://${req.get("host")}/voicerecords/`,
     });
   } catch (error) {
     console.error("Error listing voicerecords folders:", error);
