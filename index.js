@@ -24,7 +24,7 @@
 
 const app = require("./app");
 require("./Config/DBconfig"); // This will connect to MongoDB
-const port = process.env.PORT || 3002;
+const port = 3002;
 
 app.get("/", (req, res) => {
   res.send("API is running!");

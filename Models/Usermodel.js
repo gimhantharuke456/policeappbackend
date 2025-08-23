@@ -7,49 +7,49 @@ const { Schema } = mongoose;
 const officerSchema = new Schema({
   fullName: {
     type: String,
-    required: true
+    required: true,
   },
   officerSVC: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
   },
   officerRank: {
     type: String,
-    required: true
+    required: true,
   },
   policeStation: {
     type: String,
-    required: true
+    required: true,
   },
   Password: {
     type: String,
-    required: true
+    required: true,
   },
   // Optional fields for future implementation
   email: {
     type: String,
     required: false,
     unique: true,
-    sparse: true
+    sparse: true,
   },
   phone: {
     type: String,
-    required: false
+    required: false,
   },
   profilePicture: {
     type: String,
-    required: false
+    required: false,
   },
   // Timestamps
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
 // Pre-save middleware to hash password
