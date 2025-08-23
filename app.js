@@ -259,7 +259,7 @@ app.get("/api/voicerecords/:ruleName", (req, res) => {
   try {
     const { ruleName } = req.params;
     const rulePath = path.join(__dirname, "voicerecords", ruleName);
-
+    console.log(rulePath);
     // Check if directory exists locally (for development/fallback)
     if (!fs.existsSync(rulePath)) {
       return res.status(404).json({
