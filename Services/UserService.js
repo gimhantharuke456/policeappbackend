@@ -47,7 +47,7 @@ class UserService {
 
       const token = jwt.sign(
         { id: savedUser._id, officerSVC: savedUser.officerSVC },
-        process.env.JWT_SECRET,
+        'JWT_SECRET',
         { expiresIn: "48h" }
       );
 
@@ -120,7 +120,7 @@ class UserService {
 
     try {
       const decoded = await new Promise((resolve, reject) => {
-        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        jwt.verify(token, 'JWT_SECRET', (err, decoded) => {
           if (err) {
             reject(err);
           } else {

@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
-const dotenv = require("dotenv").config();
+
 
 const connection = mongoose
-  .createConnection(process.env.MONGODB_CONNECTION_LINK, {
+  .createConnection('mongodb+srv://sasithmjayaweera:IvGxzDZnpL7G5hPI@cluster0.y619q5m.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
     tlsAllowInvalidCertificates: true,
   })
   .on("open", () => {
@@ -13,27 +13,3 @@ const connection = mongoose
   });
 
 module.exports = connection;
-
-// const mongoose = require("mongoose");
-// require("dotenv").config();
-
-// // Check if environment variable exists
-// const MONGODB_URI = process.env.MONGODB_CONNECTION_LINK;
-// if (!MONGODB_URI) {
-//   console.error("MONGODB_CONNECTION_LINK environment variable is not set");
-//   process.exit(1); // Exit with error
-// }
-
-// // Use connect instead of createConnection for simpler management
-// const connectDB = async () => {
-//   try {
-//     await mongoose.connect(MONGODB_URI);
-//     console.log("MongoDB Connected");
-//     return mongoose.connection;
-//   } catch (error) {
-//     console.error("MongoDB Connection error:", error);
-//     process.exit(1);
-//   }
-// };
-
-// module.exports = connectDB();

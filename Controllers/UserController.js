@@ -84,7 +84,7 @@ exports.login = async (req, res, next) => {
 
     const token = await UserService.genarateToken(
       tokenData,
-      process.env.JWT_SECRET,
+      'JWT_SECRET',
       "48h"
     );
 
