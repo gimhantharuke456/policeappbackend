@@ -298,6 +298,8 @@ app.get("/api/voicerecords/:ruleName", (req, res) => {
       return `${r2Config.publicUrl}/${r2Config.baseFolderPath}/${encodeURIComponent(folderName)}/${encodeURIComponent(fileName)}`;
     };
 
+    console.log(generateR2Url(ruleName,mainAudioFile));
+
     if (mainAudioFile) {
       // If main audio file exists, return it directly
       const filePath = path.join(rulePath, mainAudioFile);
