@@ -249,7 +249,7 @@ app.get("/api/admin/list-svc", async (req, res) => {
 
 // Serve static voicerecords files
 // Load R2 configuration
-const r2Config = require('./config/r2Config');
+const r2Config = require('./r2Config');
 
 // Keep local static serving for backward compatibility
 app.use("/voicerecords", express.static(path.join(__dirname, "voicerecords")));

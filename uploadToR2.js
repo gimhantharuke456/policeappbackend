@@ -2,7 +2,7 @@ const { S3Client, PutObjectCommand, ListObjectsV2Command } = require('@aws-sdk/c
 const fs = require('fs');
 const path = require('path');
 const mime = require('mime-types');
-const r2Config = require('./config/r2Config');
+const r2Config = require('./r2Config');
 
 // R2 Configuration
 const r2Client = new S3Client({
