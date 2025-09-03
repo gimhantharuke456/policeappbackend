@@ -56,22 +56,23 @@ exports.login = async (req, res, next) => {
   try {
     const { officerSVC, Password } = req.body;
 
-    console.log("Login request:", {
+    console.table( {
       officerSVC,
       passwordProvided: !!Password,
       passwordLength: Password?.length,
     });
 
     const user = await UserService.checkUser(officerSVC);
+    
     if (!user) {
       return res
         .status(401)
-        .json({ status: false, error: "Invalid email or password" });
+        .json({ status: false, error: "User not found" });
     }
 
     console.log("Found user, attempting password comparison");
-    // Use the mongoose model's comparePassword method directly
-    const isMatch = await user.comparePassword(Password);
+    const isMatch = await UserService.comparePassword(Password, user.Password);
+  
     console.log("Password match result:", isMatch);
 
     if (!isMatch) {
@@ -365,4 +366,87 @@ exports.updateProfilePicture = async (req, res, next) => {
         .json({ status: false, error: "Internal Server Error" });
     }
   });
+};
+
+// Get user by SVC number
+exports.getUserBySVC = async (req, res) => {
+  try {
+    const { svcNumber } = req.params;
+    console.log("Fetching user by SVC number:", svcNumber);
+
+    // Validate SVC number format (basic validation)
+    if (!svcNumber || svcNumber.trim() === "") {
+      return res.status(400).json({
+        status: false,
+        error: "SVC number is required"
+      });
+    }
+
+    const result = await UserService.getUserById(svcNumber);
+
+    if (result.success) {
+      return res.status(200).json({
+        status: true,
+        message: "User found successfully",
+        data: result.data,
+      });
+    } else {
+      return res.status(404).json({
+        status: false,
+        error: result.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error in getUserBySVC:", error);
+    res.status(500).json({ 
+      status: false, 
+      error: "Internal Server Error" 
+    });
+  }
+};
+
+// Get all users with pagination and search
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '' } = req.query;
+    
+    console.log('Getting all users with params:', { page, limit, search });
+
+    // Validate query parameters
+    if (page && (isNaN(page) || page < 1)) {
+      return res.status(400).json({
+        status: false,
+        error: 'Invalid page number'
+      });
+    }
+
+    if (limit && (isNaN(limit) || limit < 1 || limit > 50)) {
+      return res.status(400).json({
+        status: false,
+        error: 'Invalid limit. Must be between 1 and 50'
+      });
+    }
+
+    const result = await UserService.getAllUsers(page, limit, search);
+
+    if (result.success) {
+      return res.status(200).json({
+        status: true,
+        message: 'Users retrieved successfully',
+        data: result.data.users,
+        pagination: result.data.pagination
+      });
+    } else {
+      return res.status(500).json({
+        status: false,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error in getAllUsers:', error);
+    res.status(500).json({ 
+      status: false, 
+      error: 'Internal Server Error' 
+    });
+  }
 };

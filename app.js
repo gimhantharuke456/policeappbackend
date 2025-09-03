@@ -9,18 +9,8 @@ const fs = require("fs");
 const RegSVCModel = require("./Models/RegSVC");
 
 const app = express();
+app.use(cors())
 
-// Allow requests from your production frontend and localhost during development
-const corsOptions = {
-  origin:
-    process.env.NODE_ENV === "production"
-      ? [process.env.FRONTEND_URL, "https://your-frontend-domain.vercel.app"]
-      : "http://localhost:3000",
-  optionsSuccessStatus: 200,
-  credentials: true,
-};
-
-app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 app.use(express.json());
@@ -246,6 +236,213 @@ app.get("/api/admin/list-svc", async (req, res) => {
     });
   }
 });
+
+// Endpoint to get a specific SVC by ID
+app.get("/api/admin/svc/by-number/:number", async (req, res) => {
+  try {
+    const { number } = req.params;
+
+    const svcEntry = await RegSVCModel.findOne({ officerSVC: number });
+    if (!svcEntry) {
+      return res.status(404).json({
+        success: false,
+        message: "SVC entry not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: svcEntry,
+    });
+  } catch (error) {
+    console.error("Error getting SVC:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve SVC entry",
+      error: error.message,
+    });
+  }
+});
+
+app.get("/api/admin/svc/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const svcEntry = await RegSVCModel.findById(id);
+    if (!svcEntry) {
+      return res.status(404).json({
+        success: false,
+        message: "SVC entry not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: svcEntry,
+    });
+  } catch (error) {
+    console.error("Error getting SVC:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve SVC entry",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint to update an existing SVC entry
+app.put("/api/admin/svc/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { officerSVC, officerRank, policeStation, isActive } = req.body;
+
+    // Check if SVC entry exists
+    const existingSVC = await RegSVCModel.findById(id);
+    if (!existingSVC) {
+      return res.status(404).json({
+        success: false,
+        message: "SVC entry not found",
+      });
+    }
+
+    // If officerSVC is being updated, check if the new SVC number already exists
+    if (officerSVC && officerSVC !== existingSVC.officerSVC) {
+      const duplicateSVC = await RegSVCModel.findOne({ 
+        officerSVC, 
+        _id: { $ne: id } 
+      });
+      if (duplicateSVC) {
+        return res.status(400).json({
+          success: false,
+          message: "This SVC number is already registered",
+        });
+      }
+    }
+
+    // Update the SVC entry
+    const updatedSVC = await RegSVCModel.findByIdAndUpdate(
+      id,
+      {
+        ...(officerSVC && { officerSVC }),
+        ...(officerRank !== undefined && { officerRank }),
+        ...(policeStation !== undefined && { policeStation }),
+        ...(isActive !== undefined && { isActive }),
+        updatedAt: new Date(),
+      },
+      { new: true, runValidators: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "SVC entry updated successfully",
+      data: updatedSVC,
+    });
+  } catch (error) {
+    console.error("Error updating SVC:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update SVC entry",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint to delete an SVC entry
+app.delete("/api/admin/svc/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedSVC = await RegSVCModel.findByIdAndDelete(id);
+    if (!deletedSVC) {
+      return res.status(404).json({
+        success: false,
+        message: "SVC entry not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "SVC entry deleted successfully",
+      data: deletedSVC,
+    });
+  } catch (error) {
+    console.error("Error deleting SVC:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete SVC entry",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint to bulk delete SVC entries
+app.delete("/api/admin/bulk-delete-svc", async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide an array of SVC IDs to delete",
+      });
+    }
+
+    const result = await RegSVCModel.deleteMany({ _id: { $in: ids } });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} SVC entries`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error("Error bulk deleting SVCs:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete SVC entries",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint to toggle SVC active status
+app.patch("/api/admin/svc/:id/toggle-status", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const svcEntry = await RegSVCModel.findById(id);
+    if (!svcEntry) {
+      return res.status(404).json({
+        success: false,
+        message: "SVC entry not found",
+      });
+    }
+
+    const updatedSVC = await RegSVCModel.findByIdAndUpdate(
+      id,
+      { 
+        isActive: !svcEntry.isActive,
+        updatedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `SVC entry ${updatedSVC.isActive ? 'activated' : 'deactivated'} successfully`,
+      data: updatedSVC,
+    });
+  } catch (error) {
+    console.error("Error toggling SVC status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to toggle SVC status",
+      error: error.message,
+    });
+  }
+});
+
+
+
 
 // Serve static voicerecords files
 // Load R2 configuration

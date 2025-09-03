@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const db = require("../Config/DBconfig");
-const bcrypt = require("bcrypt");
+
 
 const { Schema } = mongoose;
 
@@ -52,42 +52,6 @@ const officerSchema = new Schema({
   },
 });
 
-// Pre-save middleware to hash password
-officerSchema.pre("save", async function (next) {
-  try {
-    if (!this.isModified("Password")) {
-      console.log("Password not modified, skipping hash");
-      return next();
-    }
-
-    console.log("Pre-save: Original password:", this.Password);
-    const salt = await bcrypt.genSalt(10);
-    console.log("Pre-save: Generated salt:", salt);
-    const hashedPassword = await bcrypt.hash(this.Password, salt);
-    console.log("Pre-save: Generated hash:", hashedPassword);
-    this.Password = hashedPassword;
-    next();
-  } catch (error) {
-    console.error("Pre-save error:", error);
-    next(error);
-  }
-});
-
-// Method to compare password for login
-officerSchema.methods.comparePassword = async function (candidatePassword) {
-  try {
-    console.log("comparePassword method called");
-    console.log("Candidate password:", candidatePassword);
-    console.log("Stored hash:", this.Password);
-
-    const isMatch = await bcrypt.compare(candidatePassword, this.Password);
-    console.log("Password comparison result:", isMatch);
-    return isMatch;
-  } catch (error) {
-    console.error("comparePassword error:", error);
-    throw error;
-  }
-};
 
 // Pre-update middleware to update the updatedAt timestamp
 officerSchema.pre("findOneAndUpdate", function (next) {

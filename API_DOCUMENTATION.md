@@ -655,6 +655,198 @@ Authorization: Bearer <your-jwt-token>
 
 ---
 
+### 4. Get SVC by ID
+**Endpoint:** `GET /api/admin/svc/:id`
+
+**Description:** Retrieve a specific SVC entry by its ID
+
+**Parameters:**
+- `id` (string): The MongoDB ObjectId of the SVC entry
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "64a1b2c3d4e5f6789012345a",
+    "officerSVC": "SVC001",
+    "officerRank": "Inspector",
+    "policeStation": "Colombo Central",
+    "isActive": true,
+    "createdAt": "2023-07-03T10:30:00.000Z",
+    "updatedAt": "2023-07-03T10:30:00.000Z"
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "success": false,
+  "message": "SVC entry not found"
+}
+```
+
+---
+
+### 5. Update SVC
+**Endpoint:** `PUT /api/admin/svc/:id`
+
+**Description:** Update an existing SVC entry
+
+**Parameters:**
+- `id` (string): The MongoDB ObjectId of the SVC entry to update
+
+**Request Body:**
+```json
+{
+  "officerSVC": "SVC001_UPDATED",
+  "officerRank": "Chief Inspector",
+  "policeStation": "Colombo Central",
+  "isActive": true
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "SVC entry updated successfully",
+  "data": {
+    "_id": "64a1b2c3d4e5f6789012345a",
+    "officerSVC": "SVC001_UPDATED",
+    "officerRank": "Chief Inspector",
+    "policeStation": "Colombo Central",
+    "isActive": true,
+    "createdAt": "2023-07-03T10:30:00.000Z",
+    "updatedAt": "2023-07-03T12:45:00.000Z"
+  }
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "success": false,
+  "message": "This SVC number is already registered"
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "success": false,
+  "message": "SVC entry not found"
+}
+```
+
+---
+
+### 6. Delete SVC
+**Endpoint:** `DELETE /api/admin/svc/:id`
+
+**Description:** Delete a specific SVC entry
+
+**Parameters:**
+- `id` (string): The MongoDB ObjectId of the SVC entry to delete
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "SVC entry deleted successfully",
+  "data": {
+    "_id": "64a1b2c3d4e5f6789012345a",
+    "officerSVC": "SVC001",
+    "officerRank": "Inspector",
+    "policeStation": "Colombo Central",
+    "isActive": true,
+    "createdAt": "2023-07-03T10:30:00.000Z",
+    "updatedAt": "2023-07-03T10:30:00.000Z"
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "success": false,
+  "message": "SVC entry not found"
+}
+```
+
+---
+
+### 7. Bulk Delete SVCs
+**Endpoint:** `DELETE /api/admin/bulk-delete-svc`
+
+**Description:** Delete multiple SVC entries at once
+
+**Request Body:**
+```json
+{
+  "ids": [
+    "64a1b2c3d4e5f6789012345a",
+    "64a1b2c3d4e5f6789012345b",
+    "64a1b2c3d4e5f6789012345c"
+  ]
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Successfully deleted 3 SVC entries",
+  "deletedCount": 3
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "success": false,
+  "message": "Please provide an array of SVC IDs to delete"
+}
+```
+
+---
+
+### 8. Toggle SVC Status
+**Endpoint:** `PATCH /api/admin/svc/:id/toggle-status`
+
+**Description:** Toggle the active status of an SVC entry (activate/deactivate)
+
+**Parameters:**
+- `id` (string): The MongoDB ObjectId of the SVC entry
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "SVC entry deactivated successfully",
+  "data": {
+    "_id": "64a1b2c3d4e5f6789012345a",
+    "officerSVC": "SVC001",
+    "officerRank": "Inspector",
+    "policeStation": "Colombo Central",
+    "isActive": false,
+    "createdAt": "2023-07-03T10:30:00.000Z",
+    "updatedAt": "2023-07-03T13:15:00.000Z"
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "success": false,
+  "message": "SVC entry not found"
+}
+```
+
+---
+
 ## Rule Management APIs
 
 ### 1. Get All Tracks (Alternative)

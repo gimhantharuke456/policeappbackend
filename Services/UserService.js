@@ -1,7 +1,7 @@
 const User = require("../Models/Usermodel");
 const RegSVC = require("../Models/RegSVC");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
+const bcrypt = require('bcrypt');
 
 class UserService {
   static async registerUser(
@@ -27,19 +27,23 @@ class UserService {
       const existingUser = await User.findOne({
         officerSVC: officerSVC,
       });
+      
 
       if (existingUser) {
         console.log("User already exists");
-        return { success: false, message: "User already exists" };
+        return { success: false, message: "User already exists",existingUser };
       }
 
       console.log("Creating new user with password length:", Password.length);
+      // Hash the password before saving
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(Password, salt);
       const newUser = new User({
         fullName,
         officerSVC,
         officerRank,
         policeStation,
-        Password,
+        Password: hashedPassword,
       });
 
       // Save and log the result
@@ -89,21 +93,10 @@ class UserService {
     }
   }
 
-  static async comparePassword(user, password) {
+  static async comparePassword(plainPassword, hashedPassword) {
     try {
-      const isMatch = await bcrypt.compare(user, password);
-      console.log(isMatch);
-      return isMatch;
-    } catch (error) {
-      console.error("Error comparing password:", error);
-      return false;
-    }
-  }
-
-  static async comparePassword(user, password) {
-    try {
-      const isMatch = await bcrypt.compare(user, password);
-      console.log(isMatch);
+      const isMatch = await bcrypt.compare(plainPassword, hashedPassword);
+      console.log("UserService comparePassword result:", isMatch);
       return isMatch;
     } catch (error) {
       console.error("Error comparing password:", error);
@@ -203,6 +196,70 @@ class UserService {
       };
     } catch (error) {
       console.error("getUserById error:", error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  static async getAllUsers(page = 1, limit = 10, search = '') {
+    try {
+      console.log(`Getting all users - Page: ${page}, Limit: ${limit}, Search: ${search}`);
+      
+      // Validate pagination parameters
+      const pageNum = Math.max(1, parseInt(page));
+      const limitNum = Math.min(50, Math.max(1, parseInt(limit))); // Max 50 users per page
+      const skip = (pageNum - 1) * limitNum;
+
+      // Build search query
+      let searchQuery = {};
+      if (search && search.trim() !== '') {
+        const searchRegex = new RegExp(search.trim(), 'i');
+        searchQuery = {
+          $or: [
+            { fullName: searchRegex },
+            { officerSVC: searchRegex },
+            { officerRank: searchRegex },
+            { policeStation: searchRegex }
+          ]
+        };
+      }
+
+      // Get users with pagination (excluding sensitive data)
+      const users = await User.find(searchQuery)
+        .select('-Password -__v') // Exclude password and version key
+        .sort({ createdAt: -1 }) // Sort by newest first
+        .skip(skip)
+        .limit(limitNum)
+        .lean(); // Use lean() for better performance
+
+      // Get total count for pagination
+      const totalUsers = await User.countDocuments(searchQuery);
+      const totalPages = Math.ceil(totalUsers / limitNum);
+
+      return {
+        success: true,
+        data: {
+          users: users.map(user => ({
+            officerSVC: user.officerSVC,
+            fullName: user.fullName,
+            officerRank: user.officerRank,
+            policeStation: user.policeStation,
+            email: user.email || '',
+            phone: user.phone || '',
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+          })),
+          pagination: {
+            currentPage: pageNum,
+            totalPages,
+            totalUsers,
+            hasNextPage: pageNum < totalPages,
+            hasPrevPage: pageNum > 1,
+            limit: limitNum
+          }
+        }
+      };
+    } catch (error) {
+      console.error('getAllUsers error:', error);
       return { success: false, message: error.message };
     }
   }
